@@ -1,20 +1,10 @@
-llama-index
-llama-index-llms-groq
-llama-index-embeddings-fastembed
-fastembed
-llama-index-vector-stores-qdrant
-qdrant-client
-streamlit
-pypdf
-build-essential
-python3-dev
-streamlit>=1.30,<2.0
+streamlit==1.53.0
 
-llama-index>=0.10.30
-llama-index-core>=0.10.30
-llama-index-llms-groq>=0.1.3
-llama-index-embeddings-fastembed>=0.1.3
-llama-index-vector-stores-qdrant>=0.2.6
+llama-index==0.14.12
+llama-index-llms-groq==0.4.1
+llama-index-embeddings-fastembed==0.1.2
+llama-index-vector-stores-qdrant==0.9.1
 
-qdrant-client>=1.7.0
-fastembed>=0.3.0
+qdrant-client==1.16.2
+fastembed==0.7.4
+pypdf==6.6.0
