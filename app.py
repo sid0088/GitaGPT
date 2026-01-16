@@ -2,20 +2,9 @@ import os
 import sys
 import asyncio
 import streamlit as st
-import qdrant_client
 
-from llama_index.core import (
-    Settings,
-    VectorStoreIndex,
-    SimpleDirectoryReader,
-    StorageContext,
-    ChatPromptTemplate,
-)
 from llama_index.llms.groq import Groq
-from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
-
-from llama_index.embeddings.openai import OpenAIEmbedding
 
 # -------------------------------------------------
 # 🔒 Async safety (Streamlit health-check safe)
@@ -48,7 +37,7 @@ st.markdown(
 st.title("🕉️ GitaGPT: Divine Guidance")
 
 # -------------------------------------------------
-# 🔍 DEBUG (optional)
+# 🔍 DEBUG
 # -------------------------------------------------
 st.sidebar.write("Python version:")
 st.sidebar.code(sys.version)
@@ -63,106 +52,36 @@ if "GROQ_API_KEY" not in st.secrets:
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# 🧠 LAZY INITIALIZATION
+# 🤖 LLM (NO EMBEDDINGS)
 # -------------------------------------------------
-@st.cache_resource(show_spinner="📿 Awakening the wisdom of the Gita...")
-def initialize_index():
-    # --- LLM ---
-    llm = Groq(
-        model="llama-3.3-70b-versatile",
-        api_key=os.environ["GROQ_API_KEY"],
-    )
-
-    # --- EMBEDDINGS (Groq-supported model) ---
-    embed_model = OpenAIEmbedding(
-        model="text-embedding-3-large",
-        api_base="https://api.groq.com/openai/v1",
-        api_key=os.environ["GROQ_API_KEY"],
-    )
-
-    Settings.llm = llm
-    Settings.embed_model = embed_model
-
-    # --- LOAD DOCUMENTS ---
-    data_dir = "./data"
-    os.makedirs(data_dir, exist_ok=True)
-
-    documents = SimpleDirectoryReader(data_dir).load_data()
-
-    if not documents:
-        raise RuntimeError(
-            "❌ No documents found in ./data. "
-            "Please add Bhagavad Gita PDFs or text files."
-        )
-
-    # --- VECTOR STORE (IN-MEMORY) ---
-    qdrant = qdrant_client.QdrantClient(":memory:")
-
-    vector_store = QdrantVectorStore(
-        client=qdrant,
-        collection_name="gita_collection",
-    )
-
-    storage_context = StorageContext.from_defaults(
-        vector_store=vector_store
-    )
-
-    return VectorStoreIndex.from_documents(
-        documents,
-        storage_context=storage_context,
-    )
-
-# -------------------------------------------------
-# 🚀 STARTUP GATE
-# -------------------------------------------------
-if "index" not in st.session_state:
-    st.info("🙏 Click below to begin the sacred discourse.")
-    if st.button("Begin Discourse"):
-        try:
-            st.session_state.index = initialize_index()
-            st.success("✨ GitaGPT is ready")
-            st.rerun()
-        except Exception as e:
-            st.error(str(e))
-    st.stop()
-
-index = st.session_state.index
-
-# -------------------------------------------------
-# 🧾 QUERY ENGINE
-# -------------------------------------------------
-qa_prompt = ChatPromptTemplate(
-    [
-        ChatMessage(
-            role=MessageRole.SYSTEM,
-            content=(
-                "You are Lord Krishna. "
-                "Give calm, clear, compassionate guidance. "
-                "Answer in one short paragraph."
-            ),
-        ),
-        ChatMessage(
-            role=MessageRole.USER,
-            content="Context:\n{context_str}\n---\nQuestion: {query_str}",
-        ),
-    ]
+llm = Groq(
+    model="llama-3.3-70b-versatile",
+    api_key=os.environ["GROQ_API_KEY"],
 )
 
-query_engine = index.as_query_engine(
-    text_qa_template=qa_prompt,
-    streaming=True,
+SYSTEM_PROMPT = (
+    "You are Lord Krishna. "
+    "Respond with calm, wisdom, clarity, and compassion. "
+    "Answer in one short paragraph."
 )
 
 # -------------------------------------------------
-# 💬 CHAT UI
+# 💬 CHAT STATE
 # -------------------------------------------------
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    st.session_state.messages = [
+        {"role": "system", "content": SYSTEM_PROMPT}
+    ]
 
+# Render messages
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    if msg["role"] != "system":
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
+# -------------------------------------------------
+# 💭 USER INPUT
+# -------------------------------------------------
 user_prompt = st.chat_input("Ask Lord Krishna…")
 
 if user_prompt:
@@ -173,10 +92,21 @@ if user_prompt:
     with st.chat_message("user"):
         st.markdown(user_prompt)
 
+    # Convert to Groq messages
+    chat_messages = [
+        ChatMessage(
+            role=MessageRole.SYSTEM if m["role"] == "system" else MessageRole.USER
+            if m["role"] == "user"
+            else MessageRole.ASSISTANT,
+            content=m["content"],
+        )
+        for m in st.session_state.messages
+    ]
+
     with st.chat_message("assistant"):
-        response = query_engine.query(user_prompt)
-        full_response = st.write_stream(response.response_gen)
+        response = llm.chat(chat_messages)
+        st.markdown(response.message.content)
 
     st.session_state.messages.append(
-        {"role": "assistant", "content": full_response}
+        {"role": "assistant", "content": response.message.content}
     )
