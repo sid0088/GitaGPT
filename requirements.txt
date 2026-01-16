@@ -6,3 +6,5 @@ llama-index-vector-stores-qdrant
 qdrant-client
 streamlit
 pypdf
+build-essential
+python3-dev
