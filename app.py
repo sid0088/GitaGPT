@@ -15,11 +15,10 @@ from llama_index.llms.groq import Groq
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
 
-# ✅ Correct and ONLY embedding import
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 # -------------------------------------------------
-# 🔒 Async safety (prevents Streamlit health-check crash)
+# 🔒 Async safety (Streamlit health-check safe)
 # -------------------------------------------------
 try:
     asyncio.get_running_loop()
@@ -49,7 +48,7 @@ st.markdown(
 st.title("🕉️ GitaGPT: Divine Guidance")
 
 # -------------------------------------------------
-# 🔍 DEBUG (safe to remove later)
+# 🔍 DEBUG (optional)
 # -------------------------------------------------
 st.sidebar.write("Python version:")
 st.sidebar.code(sys.version)
@@ -64,7 +63,7 @@ if "GROQ_API_KEY" not in st.secrets:
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# 🧠 LAZY INITIALIZATION (CACHED)
+# 🧠 LAZY INITIALIZATION
 # -------------------------------------------------
 @st.cache_resource(show_spinner="📿 Awakening the wisdom of the Gita...")
 def initialize_index():
@@ -74,9 +73,9 @@ def initialize_index():
         api_key=os.environ["GROQ_API_KEY"],
     )
 
-    # --- EMBEDDINGS (Groq OpenAI-compatible) ---
+    # --- EMBEDDINGS (Groq-supported model) ---
     embed_model = OpenAIEmbedding(
-        model="text-embedding-3-small",
+        model="text-embedding-3-large",
         api_base="https://api.groq.com/openai/v1",
         api_key=os.environ["GROQ_API_KEY"],
     )
@@ -96,7 +95,7 @@ def initialize_index():
             "Please add Bhagavad Gita PDFs or text files."
         )
 
-    # --- VECTOR STORE (IN-MEMORY, STREAMLIT SAFE) ---
+    # --- VECTOR STORE (IN-MEMORY) ---
     qdrant = qdrant_client.QdrantClient(":memory:")
 
     vector_store = QdrantVectorStore(
@@ -114,7 +113,7 @@ def initialize_index():
     )
 
 # -------------------------------------------------
-# 🚀 STARTUP GATE (HEALTH-CHECK SAFE)
+# 🚀 STARTUP GATE
 # -------------------------------------------------
 if "index" not in st.session_state:
     st.info("🙏 Click below to begin the sacred discourse.")
