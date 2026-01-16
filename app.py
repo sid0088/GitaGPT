@@ -46,8 +46,8 @@ llm = Groq(
 
 SYSTEM_PROMPT = (
     "You are Lord Krishna. "
-    "Respond with calm wisdom, clarity, and compassion. "
-    "Keep answers concise and meaningful."
+    "Answer calmly and wisely in ONE clear, well-structured paragraph. "
+    "Do not use bullet points, line breaks, or lists."
 )
 
 # -------------------------------------------------
@@ -58,7 +58,7 @@ if "messages" not in st.session_state:
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
 
-# Render history
+# Render chat history
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
@@ -88,17 +88,19 @@ if prompt:
         chat_msgs.append(ChatMessage(role=role, content=m["content"]))
 
     # -------------------------------------------------
-    # STREAMING RESPONSE (KEY FIX)
+    # STREAMING → SINGLE PARAGRAPH OUTPUT
     # -------------------------------------------------
     with st.chat_message("assistant"):
+        placeholder = st.empty()
         response_text = ""
-        response = llm.stream_chat(chat_msgs)
 
-        for token in response:
+        stream = llm.stream_chat(chat_msgs)
+        for token in stream:
             if token.delta:
                 response_text += token.delta
-                st.write(response_text)
+                placeholder.markdown(response_text)
 
+    # Save final response
     st.session_state.messages.append(
-        {"role": "assistant", "content": response_text}
+        {"role": "assistant", "content": response_text.strip()}
     )
