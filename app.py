@@ -7,7 +7,7 @@ from llama_index.llms.groq import Groq
 from llama_index.core.llms import ChatMessage, MessageRole
 
 # -------------------------------------------------
-# 🔒 Async safety (Streamlit health-check safe)
+# Async safety
 # -------------------------------------------------
 try:
     asyncio.get_running_loop()
@@ -15,44 +15,29 @@ except RuntimeError:
     asyncio.set_event_loop(asyncio.new_event_loop())
 
 # -------------------------------------------------
-# 🖥️ PAGE CONFIG
+# Page config
 # -------------------------------------------------
 st.set_page_config(
     page_title="GitaGPT",
     page_icon="🕉️",
-    layout="centered",
-)
-
-st.markdown(
-    """
-    <style>
-    .stApp { background-color: #FFF9F0; }
-    h1 { color: #FF9933; text-align: center; font-family: 'Georgia', serif; }
-    .stButton>button { background-color: #FF9933; color: white; width: 100%; }
-    </style>
-    """,
-    unsafe_allow_html=True,
 )
 
 st.title("🕉️ GitaGPT: Divine Guidance")
 
-# -------------------------------------------------
-# 🔍 DEBUG
-# -------------------------------------------------
 st.sidebar.write("Python version:")
 st.sidebar.code(sys.version)
 
 # -------------------------------------------------
-# 🔐 GROQ API KEY
+# API Key
 # -------------------------------------------------
 if "GROQ_API_KEY" not in st.secrets:
-    st.error("❌ GROQ_API_KEY not found in Streamlit Secrets.")
+    st.error("GROQ_API_KEY missing in Streamlit secrets")
     st.stop()
 
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# 🤖 LLM (NO EMBEDDINGS)
+# LLM
 # -------------------------------------------------
 llm = Groq(
     model="llama-3.3-70b-versatile",
@@ -61,52 +46,59 @@ llm = Groq(
 
 SYSTEM_PROMPT = (
     "You are Lord Krishna. "
-    "Respond with calm, wisdom, clarity, and compassion. "
-    "Answer in one short paragraph."
+    "Respond with calm wisdom, clarity, and compassion. "
+    "Keep answers concise and meaningful."
 )
 
 # -------------------------------------------------
-# 💬 CHAT STATE
+# Session state
 # -------------------------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
 
-# Render messages
+# Render history
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
 # -------------------------------------------------
-# 💭 USER INPUT
+# User input
 # -------------------------------------------------
-user_prompt = st.chat_input("Ask Lord Krishna…")
+prompt = st.chat_input("Ask Lord Krishna…")
 
-if user_prompt:
+if prompt:
     st.session_state.messages.append(
-        {"role": "user", "content": user_prompt}
+        {"role": "user", "content": prompt}
     )
 
     with st.chat_message("user"):
-        st.markdown(user_prompt)
+        st.markdown(prompt)
 
     # Convert to Groq messages
-    chat_messages = [
-        ChatMessage(
-            role=MessageRole.SYSTEM if m["role"] == "system" else MessageRole.USER
-            if m["role"] == "user"
-            else MessageRole.ASSISTANT,
-            content=m["content"],
+    chat_msgs = []
+    for m in st.session_state.messages:
+        role = (
+            MessageRole.SYSTEM if m["role"] == "system"
+            else MessageRole.USER if m["role"] == "user"
+            else MessageRole.ASSISTANT
         )
-        for m in st.session_state.messages
-    ]
+        chat_msgs.append(ChatMessage(role=role, content=m["content"]))
 
+    # -------------------------------------------------
+    # STREAMING RESPONSE (KEY FIX)
+    # -------------------------------------------------
     with st.chat_message("assistant"):
-        response = llm.chat(chat_messages)
-        st.markdown(response.message.content)
+        response_text = ""
+        response = llm.stream_chat(chat_msgs)
+
+        for token in response:
+            if token.delta:
+                response_text += token.delta
+                st.write(response_text)
 
     st.session_state.messages.append(
-        {"role": "assistant", "content": response.message.content}
+        {"role": "assistant", "content": response_text}
     )
