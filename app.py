@@ -1,93 +1,164 @@
 import streamlit as st
 import os
 import qdrant_client
+
 from llama_index.core import (
-    Settings, 
-    VectorStoreIndex, 
-    SimpleDirectoryReader, 
-    StorageContext, 
-    ChatPromptTemplate
+    Settings,
+    VectorStoreIndex,
+    SimpleDirectoryReader,
+    StorageContext,
+    ChatPromptTemplate,
 )
 from llama_index.llms.groq import Groq
 from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
 
-# --- 1. PAGE SETUP ---
-st.set_page_config(page_title="GitaGPT", page_icon="🕉️")
+# -------------------------------------------------
+# 1. PAGE CONFIG
+# -------------------------------------------------
+st.set_page_config(
+    page_title="GitaGPT",
+    page_icon="🕉️",
+    layout="centered",
+)
 
-# Spiritual Saffron Styling
-st.markdown("""
+st.markdown(
+    """
     <style>
     .stApp { background-color: #FFF9F0; }
     h1 { color: #FF9933; text-align: center; font-family: 'Georgia', serif; }
     .stButton>button { background-color: #FF9933; color: white; width: 100%; }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 st.title("🕉️ GitaGPT: Divine Guidance")
 
-# --- 2. AUTHENTICATION ---
-if "GROQ_API_KEY" in st.secrets:
-    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
-else:
-    st.error("Please add GROQ_API_KEY to Streamlit Secrets.")
+# -------------------------------------------------
+# 2. AUTHENTICATION (STREAMLIT SAFE)
+# -------------------------------------------------
+if "GROQ_API_KEY" not in st.secrets:
+    st.error("❌ Please add GROQ_API_KEY in Streamlit Secrets.")
     st.stop()
 
-# --- 3. LAZY INITIALIZATION FUNCTION ---
-@st.cache_resource(show_spinner="Connecting to the Divine Wisdom... (This may take a minute)")
-def initialize_gita():
-    # Setup Models
-    llm = Groq(model="llama-3.3-70b-versatile", api_key=os.environ["GROQ_API_KEY"])
-    embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
+os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+
+# -------------------------------------------------
+# 3. INITIALIZATION FUNCTION (CACHED)
+# -------------------------------------------------
+@st.cache_resource(show_spinner="📿 Awakening the Gita’s wisdom...")
+def initialize_gita_index():
+    # LLM
+    llm = Groq(
+        model="llama-3.3-70b-versatile",
+        api_key=os.environ["GROQ_API_KEY"],
+    )
+
+    # Embeddings
+    embed_model = FastEmbedEmbedding(
+        model_name="BAAI/bge-small-en-v1.5"
+    )
+
     Settings.llm = llm
     Settings.embed_model = embed_model
 
-    # Load Data
-    if not os.path.exists("./data"):
-        os.makedirs("./data")
-    documents = SimpleDirectoryReader("./data").load_data()
-    
-    # Persistent Vector Store (More stable for Cloud)
-    client = qdrant_client.QdrantClient(path="./qdrant_db")
-    vector_store = QdrantVectorStore(client=client, collection_name="gita_collection")
-    storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    
-    return VectorStoreIndex.from_documents(documents, storage_context=storage_context)
+    # Ensure data exists
+    data_path = "./data"
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
 
-# --- 4. STARTUP LOGIC (Prevents Health Check Timeout) ---
-if "initialized" not in st.session_state:
-    st.info("Welcome! Please click below to initialize the Gita Wisdom engine.")
-    if st.button("🙏 Begin Discourse"):
-        st.session_state.index = initialize_gita()
-        st.session_state.initialized = True
-        st.rerun()
-    st.stop() # Stops execution here until button is clicked
+    documents = SimpleDirectoryReader(data_path).load_data()
 
-# --- 5. CHAT ENGINE SETUP ---
+    if len(documents) == 0:
+        raise RuntimeError(
+            "❌ No documents found in ./data. "
+            "Please upload Gita text files before deploying."
+        )
+
+    # ✅ Streamlit-safe in-memory Qdrant
+    qdrant = qdrant_client.QdrantClient(":memory:")
+
+    vector_store = QdrantVectorStore(
+        client=qdrant,
+        collection_name="gita_collection",
+    )
+
+    storage_context = StorageContext.from_defaults(
+        vector_store=vector_store
+    )
+
+    return VectorStoreIndex.from_documents(
+        documents,
+        storage_context=storage_context,
+    )
+
+# -------------------------------------------------
+# 4. LAZY START (NO HEALTH-CHECK FAILURE)
+# -------------------------------------------------
+if "index" not in st.session_state:
+    st.info("🙏 Click below to begin the sacred discourse.")
+    if st.button("Begin Discourse"):
+        try:
+            st.session_state.index = initialize_gita_index()
+            st.success("✨ GitaGPT is ready")
+            st.rerun()
+        except Exception as e:
+            st.error(str(e))
+    st.stop()
+
 index = st.session_state.index
-qa_msgs = [
-    ChatMessage(role=MessageRole.SYSTEM, content="You are Lord Krishna. Provide wise, direct guidance in one short paragraph."),
-    ChatMessage(role=MessageRole.USER, content="Context:\n{context_str}\n---\nQuery: {query_str}")
-]
-qa_prompt = ChatPromptTemplate(qa_msgs)
-query_engine = index.as_query_engine(text_qa_template=qa_prompt, streaming=True)
 
-# --- 6. CHAT INTERFACE ---
+# -------------------------------------------------
+# 5. QUERY ENGINE
+# -------------------------------------------------
+qa_prompt = ChatPromptTemplate(
+    [
+        ChatMessage(
+            role=MessageRole.SYSTEM,
+            content=(
+                "You are Lord Krishna. "
+                "Answer with calm wisdom, clarity, and compassion. "
+                "Respond in one short paragraph."
+            ),
+        ),
+        ChatMessage(
+            role=MessageRole.USER,
+            content="Context:\n{context_str}\n---\nQuestion: {query_str}",
+        ),
+    ]
+)
+
+query_engine = index.as_query_engine(
+    text_qa_template=qa_prompt,
+    streaming=True,
+)
+
+# -------------------------------------------------
+# 6. CHAT UI
+# -------------------------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-if prompt := st.chat_input("Ask Lord Krishna..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+user_prompt = st.chat_input("Ask Lord Krishna…")
+
+if user_prompt:
+    st.session_state.messages.append(
+        {"role": "user", "content": user_prompt}
+    )
+
     with st.chat_message("user"):
-        st.markdown(prompt)
+        st.markdown(user_prompt)
 
     with st.chat_message("assistant"):
-        response_stream = query_engine.query(prompt)
-        # Typewriter effect for a better user experience
-        full_response = st.write_stream(response_stream.response_gen)
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
+        response = query_engine.query(user_prompt)
+        full_reply = st.write_stream(response.response_gen)
+
+    st.session_state.messages.append(
+        {"role": "assistant", "content": full_reply}
+    )
