@@ -1,6 +1,7 @@
 llama-index
 llama-index-llms-groq
 llama-index-embeddings-fastembed
+fastembed
 llama-index-vector-stores-qdrant
 qdrant-client
 streamlit
