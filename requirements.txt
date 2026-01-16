@@ -1,0 +1,7 @@
+llama-index
+llama-index-llms-groq
+llama-index-embeddings-fastembed
+llama-index-vector-stores-qdrant
+qdrant-client
+streamlit
+pypdf
