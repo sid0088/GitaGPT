@@ -16,7 +16,7 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
 
 # 🔑 OpenAI-compatible embeddings via Groq
-from llama_index.embeddings.openai_like import OpenAILikeEmbedding
+from llama_index.embeddings.openai import OpenAIEmbedding
 
 # -------------------------------------------------
 # 🔒 Async safety for Streamlit health checks
