@@ -7,7 +7,7 @@ from llama_index.llms.groq import Groq
 from llama_index.core.llms import ChatMessage, MessageRole
 
 # -------------------------------------------------
-# Async safety
+# Async safety (Streamlit health-check safe)
 # -------------------------------------------------
 try:
     asyncio.get_running_loop()
@@ -22,7 +22,7 @@ st.set_page_config(
     page_icon="🕉️",
 )
 
-st.title("🕉️ GitaGPT: Divine Guidance")
+st.title("🕉️ GitaGPT: Guidance from the Bhagavad Gita")
 
 st.sidebar.write("Python version:")
 st.sidebar.code(sys.version)
@@ -37,7 +37,7 @@ if "GROQ_API_KEY" not in st.secrets:
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# LLM (temperature kept low for focus)
+# LLM (low temperature = clarity, not verbosity)
 # -------------------------------------------------
 llm = Groq(
     model="llama-3.3-70b-versatile",
@@ -45,14 +45,20 @@ llm = Groq(
     temperature=0.2,
 )
 
-# 🔒 STRICT SYSTEM PROMPT
+# -------------------------------------------------
+# GITA-FOCUSED SYSTEM PROMPT (CRITICAL PART)
+# -------------------------------------------------
 SYSTEM_PROMPT = (
-    "You are Lord Krishna. "
-    "Give a DIRECT answer in ONE short paragraph. "
-    "Use at most 2–3 sentences. "
-    "Be precise, practical, and calm. "
-    "Do not explain unnecessarily. "
-    "Do not use bullet points or line breaks."
+    "You are Lord Krishna speaking to Arjuna. "
+    "Answer every question strictly using the wisdom of the Bhagavad Gita. "
+    "Base your guidance on dharma (right duty), karma yoga (selfless action), "
+    "detachment from results, self-mastery, equanimity, and inner discipline. "
+    "Do NOT give modern self-help advice. "
+    "Do NOT mention verse numbers or chapters. "
+    "Paraphrase Gita teachings in simple, practical language. "
+    "Respond in ONE short paragraph of 2–3 sentences only. "
+    "Be calm, direct, and compassionate. "
+    "No bullet points, no line breaks, no unnecessary explanations."
 )
 
 # -------------------------------------------------
@@ -63,7 +69,7 @@ if "messages" not in st.session_state:
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
 
-# Render history
+# Render chat history
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
@@ -93,7 +99,7 @@ if prompt:
         chat_msgs.append(ChatMessage(role=role, content=m["content"]))
 
     # -------------------------------------------------
-    # Streaming → single short paragraph
+    # Streaming → single concise Gita-based paragraph
     # -------------------------------------------------
     with st.chat_message("assistant"):
         placeholder = st.empty()
@@ -105,7 +111,7 @@ if prompt:
                 response_text += token.delta
                 placeholder.markdown(response_text)
 
-    # Final trim (safety)
+    # Final trim
     response_text = response_text.strip()
 
     st.session_state.messages.append(
