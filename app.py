@@ -1,12 +1,7 @@
-import asyncio
-
-try:
-    asyncio.get_running_loop()
-except RuntimeError:
-    asyncio.set_event_loop(asyncio.new_event_loop())
-
-import streamlit as st
 import os
+import sys
+import asyncio
+import streamlit as st
 import qdrant_client
 
 from llama_index.core import (
@@ -17,12 +12,22 @@ from llama_index.core import (
     ChatPromptTemplate,
 )
 from llama_index.llms.groq import Groq
-from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
 
+# 🔑 OpenAI-compatible embeddings via Groq
+from llama_index.embeddings.openai_like import OpenAILikeEmbedding
+
 # -------------------------------------------------
-# 1. PAGE CONFIG
+# 🔒 Async safety for Streamlit health checks
+# -------------------------------------------------
+try:
+    asyncio.get_running_loop()
+except RuntimeError:
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+# -------------------------------------------------
+# 🖥️ PAGE CONFIG
 # -------------------------------------------------
 st.set_page_config(
     page_title="GitaGPT",
@@ -44,47 +49,55 @@ st.markdown(
 st.title("🕉️ GitaGPT: Divine Guidance")
 
 # -------------------------------------------------
-# 2. AUTHENTICATION (STREAMLIT SAFE)
+# 🔍 DEBUG (remove later if you want)
+# -------------------------------------------------
+st.sidebar.write("Python version:")
+st.sidebar.code(sys.version)
+
+# -------------------------------------------------
+# 🔐 GROQ API KEY
 # -------------------------------------------------
 if "GROQ_API_KEY" not in st.secrets:
-    st.error("❌ Please add GROQ_API_KEY in Streamlit Secrets.")
+    st.error("❌ GROQ_API_KEY not found in Streamlit Secrets.")
     st.stop()
 
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# 3. INITIALIZATION FUNCTION (CACHED)
+# 🧠 LAZY INITIALIZATION (CACHED)
 # -------------------------------------------------
-@st.cache_resource(show_spinner="📿 Awakening the Gita’s wisdom...")
-def initialize_gita_index():
-    # LLM
+@st.cache_resource(show_spinner="📿 Awakening the wisdom of the Gita...")
+def initialize_index():
+    # --- LLM ---
     llm = Groq(
         model="llama-3.3-70b-versatile",
         api_key=os.environ["GROQ_API_KEY"],
     )
 
-    # Embeddings
-    embed_model = FastEmbedEmbedding(
-        model_name="BAAI/bge-small-en-v1.5"
+    # --- EMBEDDINGS (Groq OpenAI-compatible) ---
+    embed_model = OpenAILikeEmbedding(
+        model="text-embedding-3-small",
+        api_base="https://api.groq.com/openai/v1",
+        api_key=os.environ["GROQ_API_KEY"],
     )
 
     Settings.llm = llm
     Settings.embed_model = embed_model
 
-    # Ensure data exists
-    data_path = "./data"
-    if not os.path.exists(data_path):
-        os.makedirs(data_path)
+    # --- LOAD DOCUMENTS ---
+    data_dir = "./data"
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
 
-    documents = SimpleDirectoryReader(data_path).load_data()
+    documents = SimpleDirectoryReader(data_dir).load_data()
 
-    if len(documents) == 0:
+    if not documents:
         raise RuntimeError(
             "❌ No documents found in ./data. "
-            "Please upload Gita text files before deploying."
+            "Please add Bhagavad Gita PDFs or text files."
         )
 
-    # ✅ Streamlit-safe in-memory Qdrant
+    # --- VECTOR STORE (IN-MEMORY, STREAMLIT SAFE) ---
     qdrant = qdrant_client.QdrantClient(":memory:")
 
     vector_store = QdrantVectorStore(
@@ -102,13 +115,13 @@ def initialize_gita_index():
     )
 
 # -------------------------------------------------
-# 4. LAZY START (NO HEALTH-CHECK FAILURE)
+# 🚀 STARTUP GATE (HEALTH-CHECK SAFE)
 # -------------------------------------------------
 if "index" not in st.session_state:
     st.info("🙏 Click below to begin the sacred discourse.")
     if st.button("Begin Discourse"):
         try:
-            st.session_state.index = initialize_gita_index()
+            st.session_state.index = initialize_index()
             st.success("✨ GitaGPT is ready")
             st.rerun()
         except Exception as e:
@@ -118,7 +131,7 @@ if "index" not in st.session_state:
 index = st.session_state.index
 
 # -------------------------------------------------
-# 5. QUERY ENGINE
+# 🧾 QUERY ENGINE
 # -------------------------------------------------
 qa_prompt = ChatPromptTemplate(
     [
@@ -126,8 +139,8 @@ qa_prompt = ChatPromptTemplate(
             role=MessageRole.SYSTEM,
             content=(
                 "You are Lord Krishna. "
-                "Answer with calm wisdom, clarity, and compassion. "
-                "Respond in one short paragraph."
+                "Give calm, clear, compassionate guidance. "
+                "Answer in one short paragraph."
             ),
         ),
         ChatMessage(
@@ -143,7 +156,7 @@ query_engine = index.as_query_engine(
 )
 
 # -------------------------------------------------
-# 6. CHAT UI
+# 💬 CHAT UI
 # -------------------------------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -164,8 +177,8 @@ if user_prompt:
 
     with st.chat_message("assistant"):
         response = query_engine.query(user_prompt)
-        full_reply = st.write_stream(response.response_gen)
+        full_response = st.write_stream(response.response_gen)
 
     st.session_state.messages.append(
-        {"role": "assistant", "content": full_reply}
+        {"role": "assistant", "content": full_response}
     )
