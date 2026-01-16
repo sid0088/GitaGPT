@@ -37,17 +37,22 @@ if "GROQ_API_KEY" not in st.secrets:
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# LLM
+# LLM (temperature kept low for focus)
 # -------------------------------------------------
 llm = Groq(
     model="llama-3.3-70b-versatile",
     api_key=os.environ["GROQ_API_KEY"],
+    temperature=0.2,
 )
 
+# 🔒 STRICT SYSTEM PROMPT
 SYSTEM_PROMPT = (
     "You are Lord Krishna. "
-    "Answer calmly and wisely in ONE clear, well-structured paragraph. "
-    "Do not use bullet points, line breaks, or lists."
+    "Give a DIRECT answer in ONE short paragraph. "
+    "Use at most 2–3 sentences. "
+    "Be precise, practical, and calm. "
+    "Do not explain unnecessarily. "
+    "Do not use bullet points or line breaks."
 )
 
 # -------------------------------------------------
@@ -58,7 +63,7 @@ if "messages" not in st.session_state:
         {"role": "system", "content": SYSTEM_PROMPT}
     ]
 
-# Render chat history
+# Render history
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
@@ -88,7 +93,7 @@ if prompt:
         chat_msgs.append(ChatMessage(role=role, content=m["content"]))
 
     # -------------------------------------------------
-    # STREAMING → SINGLE PARAGRAPH OUTPUT
+    # Streaming → single short paragraph
     # -------------------------------------------------
     with st.chat_message("assistant"):
         placeholder = st.empty()
@@ -100,7 +105,9 @@ if prompt:
                 response_text += token.delta
                 placeholder.markdown(response_text)
 
-    # Save final response
+    # Final trim (safety)
+    response_text = response_text.strip()
+
     st.session_state.messages.append(
-        {"role": "assistant", "content": response_text.strip()}
+        {"role": "assistant", "content": response_text}
     )
