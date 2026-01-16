@@ -7,7 +7,7 @@ from llama_index.llms.groq import Groq
 from llama_index.core.llms import ChatMessage, MessageRole
 
 # -------------------------------------------------
-# Async safety
+# Async safety (Streamlit health-check safe)
 # -------------------------------------------------
 try:
     asyncio.get_running_loop()
@@ -22,7 +22,7 @@ st.set_page_config(
     page_icon="🕉️",
 )
 
-st.title("🕉️ GitaGPT — Bhagavad Gita Only")
+st.title("🕉️ GitaGPT: Guidance from the Bhagavad Gita")
 
 st.sidebar.write("Python version:")
 st.sidebar.code(sys.version)
@@ -37,30 +37,28 @@ if "GROQ_API_KEY" not in st.secrets:
 os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # -------------------------------------------------
-# LLM (very low temperature to reduce invention)
+# LLM (low temperature = clarity, not verbosity)
 # -------------------------------------------------
 llm = Groq(
     model="llama-3.3-70b-versatile",
     api_key=os.environ["GROQ_API_KEY"],
-    temperature=0.1,
+    temperature=0.2,
 )
 
 # -------------------------------------------------
-# STRICT GITA-ONLY SYSTEM PROMPT
+# GITA-FOCUSED SYSTEM PROMPT (CRITICAL PART)
 # -------------------------------------------------
 SYSTEM_PROMPT = (
-    "You are Krishna in the Bhagavad Gita. "
-    "Answer ONLY using teachings that explicitly exist in the Bhagavad Gita. "
-    "Base responses strictly on dharma, karma yoga, jnana, bhakti, detachment from results, "
-    "self-control of mind and senses, and equanimity as taught in the Gita. "
-    "DO NOT add ideas from modern psychology, self-help, or other scriptures. "
-    "DO NOT invent verses, examples, or explanations not present in the Gita. "
-    "If the Bhagavad Gita does not directly address the question, say clearly: "
-    "'The Bhagavad Gita does not give direct guidance on this.' "
-    "Do not guess or extrapolate beyond the text. "
-    "Do not mention chapter or verse numbers. "
-    "Respond in ONE short paragraph of at most 2 sentences. "
-    "Be precise, literal, and faithful to the Gita."
+    "You are Lord Krishna speaking to Arjuna. "
+    "Answer every question strictly using the wisdom of the Bhagavad Gita. "
+    "Base your guidance on dharma (right duty), karma yoga (selfless action), "
+    "detachment from results, self-mastery, equanimity, and inner discipline. "
+    "Do NOT give modern self-help advice. "
+    "Do NOT mention verse numbers or chapters. "
+    "Paraphrase Gita teachings in simple, practical language. "
+    "Respond in ONE short paragraph of 2–3 sentences only. "
+    "Be calm, direct, and compassionate. "
+    "No bullet points, no line breaks, no unnecessary explanations."
 )
 
 # -------------------------------------------------
@@ -80,7 +78,7 @@ for msg in st.session_state.messages:
 # -------------------------------------------------
 # User input
 # -------------------------------------------------
-prompt = st.chat_input("Ask a question related to the Bhagavad Gita…")
+prompt = st.chat_input("Ask Lord Krishna…")
 
 if prompt:
     st.session_state.messages.append(
@@ -90,7 +88,7 @@ if prompt:
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Convert messages
+    # Convert to Groq messages
     chat_msgs = []
     for m in st.session_state.messages:
         role = (
@@ -101,7 +99,7 @@ if prompt:
         chat_msgs.append(ChatMessage(role=role, content=m["content"]))
 
     # -------------------------------------------------
-    # Streaming with single clean paragraph
+    # Streaming → single concise Gita-based paragraph
     # -------------------------------------------------
     with st.chat_message("assistant"):
         placeholder = st.empty()
@@ -113,6 +111,7 @@ if prompt:
                 response_text += token.delta
                 placeholder.markdown(response_text)
 
+    # Final trim
     response_text = response_text.strip()
 
     st.session_state.messages.append(
