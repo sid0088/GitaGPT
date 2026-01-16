@@ -15,11 +15,11 @@ from llama_index.llms.groq import Groq
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core.llms import ChatMessage, MessageRole
 
-# 🔑 OpenAI-compatible embeddings via Groq
+# ✅ Correct and ONLY embedding import
 from llama_index.embeddings.openai import OpenAIEmbedding
 
 # -------------------------------------------------
-# 🔒 Async safety for Streamlit health checks
+# 🔒 Async safety (prevents Streamlit health-check crash)
 # -------------------------------------------------
 try:
     asyncio.get_running_loop()
@@ -49,7 +49,7 @@ st.markdown(
 st.title("🕉️ GitaGPT: Divine Guidance")
 
 # -------------------------------------------------
-# 🔍 DEBUG (remove later if you want)
+# 🔍 DEBUG (safe to remove later)
 # -------------------------------------------------
 st.sidebar.write("Python version:")
 st.sidebar.code(sys.version)
@@ -75,7 +75,7 @@ def initialize_index():
     )
 
     # --- EMBEDDINGS (Groq OpenAI-compatible) ---
-    embed_model = OpenAILikeEmbedding(
+    embed_model = OpenAIEmbedding(
         model="text-embedding-3-small",
         api_base="https://api.groq.com/openai/v1",
         api_key=os.environ["GROQ_API_KEY"],
@@ -86,8 +86,7 @@ def initialize_index():
 
     # --- LOAD DOCUMENTS ---
     data_dir = "./data"
-    if not os.path.exists(data_dir):
-        os.makedirs(data_dir)
+    os.makedirs(data_dir, exist_ok=True)
 
     documents = SimpleDirectoryReader(data_dir).load_data()
 
